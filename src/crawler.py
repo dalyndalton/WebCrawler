@@ -6,6 +6,7 @@ from typing import List, Set
 from urllib.parse import urldefrag, urlparse, urljoin
 from bs4 import BeautifulSoup
 import requests
+from requests import ConnectionError
 from urllib.parse import urljoin
 
 # Use for link comparison and sorting
@@ -45,6 +46,9 @@ class Link():
 
     def __eq__(self, other: 'Link') -> bool:
         return self.url == other.url
+
+    def __hash__(self) -> int:
+        return hash(self.url)
 
     def handle_url(self, base_url: str) -> None:
         """
@@ -99,12 +103,12 @@ class CrawlerManager():
         self.links = Queue(0)
 
         self.link_lock = Lock()
-        self.parent_lock = Lock()
         self.set_lock = Lock()
 
         self.visited: Set[str] = set()
         self.base_url: Link = Link(url, 0)
         self.links.put(self.base_url)
+        self.visited.add(self.base_url.url)
 
         self.threads: List[Thread] = []
         self.threadcount = threads
@@ -115,7 +119,7 @@ class CrawlerManager():
         """
         for _ in range(self.threadcount):
             crawler = Crawler(self.base_url, self.links,
-                              self.visited, self.link_lock, self.parent_lock, self.set_lock, self.depth)
+                              self.visited, self.link_lock, self.set_lock, self.depth)
             crawler.daemon = True
             crawler.start()
             self.threads.append(crawler)
@@ -130,7 +134,7 @@ class CrawlerManager():
 
 class Crawler(Thread):
 
-    def __init__(self, parent: Link, links: Queue, visited: set, url_lock: Lock, parent_lock: Lock, set_lock: Lock, max_depth: int = None):
+    def __init__(self, parent: Link, links: Queue, visited: set, url_lock: Lock, set_lock: Lock, max_depth: int = None):
         """Creates a web crawler thread for processing html
 
         Args:
@@ -145,14 +149,15 @@ class Crawler(Thread):
         self.max_depth = max_depth
         self.base_url: Link = parent
         self.links: Queue[Link] = links
-        self.visited: Set[Link] = visited
+        self.visited: Set[str] = visited
 
         self.url_lock: Lock = url_lock
-        self.parent_lock: Lock = parent_lock
         self.set_lock: Lock = set_lock
 
     def run(self) -> None:
-
+        """
+        The code here looks messy, but its for a reason.  Whenever modifying data that is shared between threads we first need to prevent it's use in other threads, and then access it.
+        """
         while True:
             # get link, used to maintain thread safety
             self.url_lock.acquire()
@@ -174,27 +179,19 @@ class Crawler(Thread):
             if link is None:
                 continue
 
-            # Check if site is visited
-            self.set_lock.acquire()
-            if link.url in self.visited:
-                self.set_lock.release()
-                continue
-            self.set_lock.release()
-
             # Check if depth is reached
             if self.max_depth is not None:
                 if link.depth == self.max_depth:
                     continue
 
             try:
+                # mark as visited
+                self.set_lock.acquire()
+                self.set_lock.release()
+
                 # Get HTML Tags
                 req = requests.get(link.url)
                 soup = BeautifulSoup(req.content, "html.parser")
-
-                # mark as visited
-                self.set_lock.acquire()
-                self.visited.add(link.url)
-                self.set_lock.release()
 
                 # search for href
                 for tag in soup.find_all('a'):
@@ -207,18 +204,20 @@ class Crawler(Thread):
 
                     if visit and tempLink.url is not None:
                         # Bind Link
-                        self.parent_lock.acquire()
-
-                        tempLink.set_parent(link)
                         link.add_child(tempLink)
-                        self.parent_lock.release()
+                        tempLink.set_parent(link)
 
-                        self.url_lock.acquire()
                         self.links.put(tempLink)
-                        self.url_lock.release()
+
+                        self.set_lock.acquire()
+                        self.visited.add(tempLink.url)
+                        self.set_lock.release()
+
+            except ConnectionError as e:
+                print(f"Error: {link} | connection refused", file=sys.stderr)
 
             except Exception as e:
-                print(f"Error: {link} | {e}")
+                print(f"Error: {link} | {type(e)}", file=sys.stderr)
 
             finally:
                 # Mark queue as ready

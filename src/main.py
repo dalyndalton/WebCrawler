@@ -36,7 +36,8 @@ def main():
     try:
         manager.run()
     except KeyboardInterrupt:
-        print("program exited manually, exiting now . . .", flush=True)
+        print("program exited manually, exiting now . . .",
+              flush=True, file=sys.stderr)
 
     finally:
         time = perf_counter() - start
