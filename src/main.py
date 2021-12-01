@@ -1,27 +1,29 @@
 from crawler import CrawlerManager, validate
 import sys
 from time import perf_counter
+import argparse
 
 
 def main():
-    # TODO: Add a proper flag parser
-    # Missing Link
-    if len(sys.argv) < 2:
-        print("Missing absolute URL to scrape", file=sys.stderr)
-        sys.exit(1)
+    # Creates argument parser and arguments
+    parser = argparse.ArgumentParser(description="A multithreaded web scraper")
+    parser.add_argument('Link', metavar='link', type=str,
+                        help="an absolute link to the starter website")
+    parser.add_argument('-d', metavar='--depth', type=int,
+                        help="The maximum depth the crawer should search", default=3)
+    parser.add_argument('-t', metavar='--thread_count',
+                        help="Number of threads to create, for smaller depths less threads can be beneficial", type=int, default=10)
 
-    url = sys.argv[1]
+    args = parser.parse_args()
+    print(args)
+    url = args.Link
+    max_depth = args.d
+    threads = args.t
 
     # Invalid Link
     if not validate(url):
         print("Invalid url, please provide url with included schema 'http://' or 'https://'", file=sys.stderr)
         sys.exit(1)
-
-    # Optional Max Depth
-    max_depth = int(sys.argv[2]) if len(sys.argv) >= 3 else 3
-
-    # Optional Thread Count
-    threads = int(sys.argv[3]) if len(sys.argv) >= 4 else 20
 
     # Build data for threads
     print(

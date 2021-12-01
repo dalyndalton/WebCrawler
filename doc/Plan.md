@@ -58,6 +58,9 @@ We aren't doing much in the way of mathematics, but we are creating a few things
 `threading` - allows the creation of multiple threads to perform requests concurrently, this way i can request multiple websites at once.
 `typing` - python type hinting, helps with ide completion and self documentation
 `functools` - provides the total ordering decorator, which means I only have to write 2 comparison operators and it extrapolates the rest, used to allow for sorting on custom classes.
+`argparse` - allows for the creation of simple command line interface arguments, also enables tab completion 
+
+Ok so i got a *little* carried away with the imports, the assignments about 3rd party imports right? Plus everything here is included in the standard library, so no imports should be needed.
 
 <!-- **Deliver:**
 
