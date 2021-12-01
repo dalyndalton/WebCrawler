@@ -4,24 +4,62 @@
 
 **Deliver:**
 
-*   A detailed written description of the problem this program aims to solve.
+<!-- *   A detailed written description of the problem this program aims to solve.
 *   Describe what a *good* solution looks like.
     *   List what you already know how to do.
-    *   Point out any challenges that you can foresee.
+    *   Point out any challenges that you can foresee. -->
 
+We're making a web crawler with some standard features and some "not so standard" features 😎
 
+### Features
+- Error handling of bad url's (2XX and 4XX errors)
+  - Errors should be handled by the program rather than the `requests` library
+- Parse urls, creating absolute url's when provided with relative ones
+- ***Multithread Support***
+- Simple CLI 
+- Easy display and formatting
+  - Websites will be listed underneath their parent in alphabetical order
+
+### My knowledge
+The hardest part of the assignment will be the self imposed multithreading requirement, but I chose to do this as I'm already familiar with `bs4` and the `requests` library from previous projects.
+
+### Challenges
+- Maintaining data safety when accessing queue and parent classes (preventing race conditions)
+- Displaying the data after all links are created, originally you would print as found but now that isn't possible as its searching multiple places at the same time
+- Keeping track of parents and child links will also be difficult, as we can't garentee that the link currenly being processed relates to the one prior.
+- 
 ## Phase 1: System Analysis *(10%)*
 
 **Deliver:**
 
-*   List all of the data that is used by the program, making note of where it comes from.
+<!-- *   List all of the data that is used by the program, making note of where it comes from.
 *   Explain what form the output will take.
-*   Describe what algorithms and formulae will be used (but don't write them yet).
+*   Describe what algorithms and formulae will be used (but don't write them yet). -->
 
+Data from this program will be coming from the *WorldWideWeb*, or any web server that houses html.  Websites will be specified in the command line, along with several optional features.
 
+```
+python src/main.py link [depth[thread count]]
+```
+
+Users can provide a custom depth to prevent their program from eating the internet, and a custom thread count to min / max performance and time.
+
+### Algorithms
+We aren't doing much in the way of mathematics, but we are creating a few things of note.
+
+- A double linked list of parents to children
+- Parsing URLS and determining validity
+- Locks for data safety
+- 
 ## Phase 2: Design *(30%)*
 
-**Deliver:**
+### ILLEGAL IMPORTS AND THEIR USES
+`queue` - provides a thread safe data structure for use with `threading`
+`threading` - allows the creation of multiple threads to perform requests concurrently, this way i can request multiple websites at once.
+`typing` - python type hinting, helps with ide completion and self documentation
+`functools` - provides the total ordering decorator, which means I only have to write 2 comparison operators and it extrapolates the rest, used to allow for sorting on custom classes.
+
+<!-- **Deliver:**
 
 *   Function signatures that include:
     *   Descriptive names.
@@ -29,27 +67,69 @@
     *   Documentation strings that explain the purpose, inputs and outputs.
 *   Pseudocode that captures how each function works.
     *   Explain what happens in the face of good and bad input.
-    *   Write a few specific examples that occurred to you.
+    *   Write a few specific examples that occurred to you. -->
+
+If you want the signature, go look at the code.  I try to keep them attached there rather than here, reserving this for a higher level overview.
+
+### `class Link()`
+The link class acts as both a data structure and a data parser for our links and all of their information.  It includes four key variables
+
+- `self.url : str` -> the url that's been provided by the scraper
+- `self.depth : int` -> the current depth of the link, used alongside the max_depth checks
+- `self.parent : Link` ->the parent link, used for displaying the link and maintaining relation
+- `self.children : List[Link]` -> a list of the link's children, used for display
+  
+`self.parent` and `self.children` are all modified using their respective setters and adders.
+
+This function also includes some comparison functions( `__lt__` and `__eq__`) that, alongside the `@totalordering`, allow the links to be sorted like a list of strings.
+
+`print_list()` keeps track of both how many elements have been found, as well as displays the links and children with proper formatting recursively.  Returns the number of links found.
+
+`handle_url` modifies the internal `url` variable by first checking its validity, converting to an absolute if needed, and discarding if missing the proper schema.
+
+The link class does no error handling of its own, instead relying on the other handling of each individual thread.
 
 
+### `CrawlerManager()`
+
+This class acts as a central interface to create the nessesary structures for each thread, and share them.  This simple class provides 2 functions, and mirrors the data requried for the crawlers to work
+
+Data shared with the `Crawler` class
+- `links : Queue` : a Queue to store links that are ready to process
+- `link_lock : Lock` : A flag that signals to all other threads that a thread is accessing the data, prevents threads from grabbing the same thread (race cases)
+- `parent_lock : Lock` : Same as above, but for modifying parent links, this is used seperate for speed reasons.
+- `visited: set` : contains all links that have been previously visted to prevent double reads
+- `base_url : Link` : The first link provided by the user
+
+Data unique to the manager
+- `threads: List[Thread]` : a list of all currently running threads, used in conjunction with a listener to make sure all threads complete before exit
+- `threadcount: int` : number of threads to create
+- `depth: int ` : max depth requested by user
+  
+###
 ## Phase 3: Implementation *(15%)*
 
-**Deliver:**
+<!-- **Deliver:**
 
 *   (More or less) working Python code.
 *   Note any relevant and interesting events that happened while you wrote the code.
-    *   e.g. things you learned, things that didn't go according to plan
+    *   e.g. things you learned, things that didn't go according to plan -->
+
+Program was implemented through a fever dream.  Some things that needed to be changed was creating a central manager, my first attempt at printing failed as well.  However, the thread implementation worked much better than initially expected.
 
 
 ## Phase 4: Testing & Debugging *(30%)*
 
-**Deliver:**
+<!-- **Deliver:**
 
 *   A set of test cases that you have personally run on your computer.
     *   Include a description of what happened for each test case.
     *   For any bugs discovered, describe their cause and remedy.
-*   Write your test cases in plain language such that a non-coder could run them and replicate your experience.
+*   Write your test cases in plain language such that a non-coder could run them and replicate your experience. -->
 
+### Bugs
+- A bug was discovered during implementation where it would never progress past the first depth, this was due to incorrectly marking found links as visited before parsed.
+- Threads created plenty of bugs when they would die early or never quit, this was remedied by only killing a thread when the queue is empty for .3 seconds.
 
 ## Phase 5: Deployment *(5%)*
 

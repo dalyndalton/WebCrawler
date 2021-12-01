@@ -1,78 +1,199 @@
-#!/usr/bin/python3
-
-
-# pip install --user requests beautifulsoup4
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urlparse, urljoin
+# I mean you said you wanted some 3rd party libraries :D
 import sys
-import time
+from threading import Thread, Lock
+from queue import Queue, Empty
+from typing import List, Set
+from urllib.parse import urldefrag, urlparse, urljoin
+from bs4 import BeautifulSoup
+import requests
+from urllib.parse import urljoin
+
+# Use for link comparison and sorting
+from functools import total_ordering
 
 
-print("\tTODO: delete each TODO message as you fulfill it")
-
-print("\tTODO: You will need to change crawl's signature to fulfill this assignment.")
-def crawl(url):
+@total_ordering
+class Link():
+    """ Extension of a simple link, that also keeps track of peers, parent, and depth
     """
-    Given an absolute URL, print each hyperlink found within the document.
 
-    Your task is to make this into a recursive function that follows hyperlinks
-    until one of two base cases are reached:
+    def __init__(self, url: str, depth: int) -> None:
+        """Creates a link with some extra attributes
 
-    0) No new, unvisited links are found
-    1) The maximum depth of recursion is reached
-    """
+        Args:
+            url (str): a valid url
+            depth (int): the depth of the current link in relation to the base
+        """
+        self.url: str = url
+        self.depth: int = depth
 
-    print("\tTODO: Check the current depth of recursion; return now if you have gone too deep")
-    print("\tTODO: Print this URL with indentation indicating the current depth of recursion")
-    print("\tTODO: Handle exceptions (including KeyboardInterrupt) gracefully and prevent this program from crashing")
-    response = requests.get(url)
-    if not response.ok:
-        print(f"crawl({url}): {response.status_code} {response.reason}")
-        return
+        self.parent: Link = None
+        self.children: List[Link] = []
 
-    html = BeautifulSoup(response.text, 'html.parser')
-    links = html.find_all('a')
-    for a in links:
-        link = a.get('href')
-        if link:
-            # Create an absolute address from a (possibly) relative URL
-            absoluteURL = urljoin(url, link)
+    def set_parent(self, parent: 'Link') -> None:
+        self.parent = parent
 
-            # Only deal with resources accessible over HTTP or HTTPS
-            if absoluteURL.startswith('http'):
-                print(absoluteURL)
+    def add_child(self, child: 'Link') -> None:
+        self.children.append(child)
 
-    print("\n\tTODO: Don't just print URLs found in this document, visit them!")
-    print("\tTODO: Trim fragments ('#' to the end) from URLs")
-    print("\tTODO: Use a `set` data structure to keep track of URLs you've already visited")
-    print("\tTODO: Call crawl() on unvisited URLs")
+    def __str__(self) -> str:
+        return self.url
 
-    return
+    # Comparison for sorted output
+    def __lt__(self, other: 'Link'):
+        return self.url < other.url
+
+    def __eq__(self, other: 'Link') -> bool:
+        return self.url == other.url
+
+    def handle_url(self, base_url: str) -> None:
+        """
+        Modifies the current Link's url by performing checks and stripping info:
+        - removes fragments
+        - converts to absolute link
+        - removes all links but links containing http and https schemas
+
+        Args:
+            base_url (str): the base url, provided by the user
+
+        """
+        # Remove Fragments
+        self.url, _ = urldefrag(self.url)
+
+        # Parse url into parts
+        dump = urlparse(self.url)
+
+        # Check for absolute
+        if not dump.scheme:
+            self.url = urljoin(base_url, self.url)
+
+        # Remove all other protocols
+        elif dump.scheme != 'http' and dump.scheme != 'https':
+            self.url = None
+
+    def print_link(self) -> int:
+        """Prints all of the links recursively, and returns the number of links found
+
+        Returns:
+            int: number of links found
+        """
+        print(('\t' * self.depth) + self.url)
+        total = 1
+        self.children.sort()
+        for link in self.children:
+            total += link.print_link()
+        return total
 
 
-## An absolute URL is required to begin
-if len(sys.argv) < 2:
-    print("Error: no Absolute URL supplied")
-    sys.exit(1)
-else:
-    url = sys.argv[1]
+class CrawlerManager():
+    """manages and controls threads from a single interface"""
+    def __init__(self, url: str, threads: int, max_depth: int) -> None:
+        """Creates a manager to manage each of the cralwer threads from a single interface.
 
-print("\tTODO: determine whether variable `url` is an absolute URL")
+        Args:
+            url (str): the first absolute url to search
+            threads (int): the number of threads (workers) to create
+            max_depth (int): the maximum recursion before search stops
+        """
+        self.links = Queue(0)
+        self.link_lock = Lock()
+        self.parent_lock = Lock()
+        self.visited: Set[str] = set()
+        self.base_url: Link = Link(url, 0)
+        self.links.put(self.base_url)
 
-print("\tTODO: allow the user to optionally override the default recursion depth of 3")
-maxDepth = 3
+        self.threads: List[Thread] = []
+        self.threadcount = threads
+        self.depth = max_depth
 
-plural = 's' if maxDepth != 1 else ''
-print(f"Crawling from {url} to a maximum depth of {maxDepth} link{plural}")
+    def run(self):
+        """Creates and runs each of the threads
+        """
+        for _ in range(self.threadcount):
+            crawler = Crawler(self.base_url, self.links,
+                              self.visited, self.link_lock, self.parent_lock, self.depth)
+            crawler.daemon = True
+            crawler.start()
+            self.threads.append(crawler)
+
+        # Waits for each thread to finish
+        for crawler in self.threads:
+            crawler.join()
+
+    def print_links(self) -> int:
+        return self.base_url.print_link()
 
 
-print("\tTODO: note what time the program began")
+class Crawler(Thread):
 
-print("\tTODO: crawl() keeps track of its max depth with a parameter, not a global!")
-print("TODO: wrap this call to crawl() in a try/except block to catch KeyboardInterrupt")
-crawl(url)
+    def __init__(self, parent: Link, links, visited, url_lock, parent_lock, max_depth=None):
+        Thread.__init__(self)
+        self.max_depth = max_depth
+        self.base_url: Link = parent
+        self.links: Queue[Link] = links
+        self.visited: Set[Link] = visited
 
-print("\tTODO: after the program finishes for any reason, report how long it ran and the number of unique URLs visited")
+        self.url_lock: Lock = url_lock
+        self.parent_lock: Lock = parent_lock
 
-print("\tTODO: are all of the TODOs deleted?")
+    def run(self) -> None:
+
+        while True:
+
+            # get link, used to maintain thread safety
+            self.url_lock.acquire()
+            print(
+                f"Links found: {len(self.visited) } | Queue: {self.links.qsize()}", file=sys.stderr, end='\r')
+
+            try:
+                # Thread times out after .3 seconds
+                link = self.links.get(True, .3)
+            except Empty:
+                break
+
+            finally:
+                self.url_lock.release()
+
+            # Mark queue as ready
+            self.links.task_done()
+
+            # Check if link returned
+            if link is None:
+                continue
+
+            # Check if site is visited
+            if link.url in self.visited:
+                continue
+
+            # Check if depth is reached
+            if self.max_depth is not None:
+                if link.depth == self.max_depth:
+                    continue
+
+            try:
+                # Get HTML Tags
+                req = requests.get(link.url)
+                soup = BeautifulSoup(req.content, "html.parser")
+                # mark as visited
+                self.visited.add(link.url)
+
+                # search for href
+                for tag in soup.find_all('a'):
+                    tempLink = Link(tag.get("href"), link.depth + 1)
+                    tempLink.handle_url(self.base_url.url)
+                    if tempLink.url not in self.visited and tempLink.url is not None:
+                        # Bind Link
+                        self.parent_lock.acquire()
+                        tempLink.set_parent(link)
+                        link.add_child(tempLink)
+                        self.parent_lock.release()
+                        self.links.put(tempLink)
+
+            except Exception as e:
+                print(f"Error: {link} | {e}")
+
+
+def validate(url: str) -> bool:
+    if urlparse(url).scheme:
+        return True
+    return False

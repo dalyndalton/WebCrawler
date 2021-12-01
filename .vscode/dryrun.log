@@ -1,0 +1,6 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/dalyndalton/Code/CS1440/cs1440-dalton-dalyn-assn5'
+make: Leaving directory '/home/dalyndalton/Code/CS1440/cs1440-dalton-dalyn-assn5'
+ 
+make: *** No targets specified and no makefile found.  Stop.
+ 
