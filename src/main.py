@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from crawler import CrawlerManager, validate
 import sys
 from time import perf_counter, sleep, thread_time
@@ -36,8 +38,9 @@ def main():
     try:
         manager.run()
     except KeyboardInterrupt:
-        print("program exited manually, exiting now . . .",
+        print("\nprogram exited manually, exiting now . . .",
               flush=True, file=sys.stderr)
+        manager.stop()
 
     finally:
         time = perf_counter() - start

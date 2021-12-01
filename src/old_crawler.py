@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+# This is just here for fun :D
 
 # pip install --user requests beautifulsoup4
 import requests
@@ -12,6 +13,8 @@ import time
 print("\tTODO: delete each TODO message as you fulfill it")
 
 print("\tTODO: You will need to change crawl's signature to fulfill this assignment.")
+
+
 def crawl(url):
     """
     Given an absolute URL, print each hyperlink found within the document.
@@ -51,7 +54,7 @@ def crawl(url):
     return
 
 
-## An absolute URL is required to begin
+# An absolute URL is required to begin
 if len(sys.argv) < 2:
     print("Error: no Absolute URL supplied")
     sys.exit(1)

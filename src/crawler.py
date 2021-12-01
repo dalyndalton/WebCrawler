@@ -1,6 +1,6 @@
 # I mean you said you wanted some 3rd party libraries :D
 import sys
-from threading import Thread, Lock
+from threading import Event, Thread, Lock
 from queue import Queue, Empty
 from typing import List, Set
 from urllib.parse import urldefrag, urlparse, urljoin
@@ -89,49 +89,6 @@ class Link():
         return total
 
 
-class CrawlerManager():
-    """manages and controls threads from a single interface"""
-
-    def __init__(self, url: str, threads: int, max_depth: int) -> None:
-        """Creates a manager to manage each of the cralwer threads from a single interface.
-
-        Args:
-            url (str): the first absolute url to search
-            threads (int): the number of threads (workers) to create
-            max_depth (int): the maximum recursion before search stops
-        """
-        self.links = Queue(0)
-
-        self.link_lock = Lock()
-        self.set_lock = Lock()
-
-        self.visited: Set[str] = set()
-        self.base_url: Link = Link(url, 0)
-        self.links.put(self.base_url)
-        self.visited.add(self.base_url.url)
-
-        self.threads: List[Thread] = []
-        self.threadcount = threads
-        self.depth = max_depth
-
-    def run(self):
-        """Creates and runs each of the threads
-        """
-        for _ in range(self.threadcount):
-            crawler = Crawler(self.base_url, self.links,
-                              self.visited, self.link_lock, self.set_lock, self.depth)
-            crawler.daemon = True
-            crawler.start()
-            self.threads.append(crawler)
-
-        # Waits for each thread to finish
-        for crawler in self.threads:
-            crawler.join()
-
-    def print_links(self) -> int:
-        return self.base_url.print_link()
-
-
 class Crawler(Thread):
 
     def __init__(self, parent: Link, links: Queue, visited: set, url_lock: Lock, set_lock: Lock, max_depth: int = None):
@@ -153,13 +110,18 @@ class Crawler(Thread):
 
         self.url_lock: Lock = url_lock
         self.set_lock: Lock = set_lock
+        self._stop_event: Event = Event()
 
     def run(self) -> None:
         """
         The code here looks messy, but its for a reason.  Whenever modifying data that is shared between threads we first need to prevent it's use in other threads, and then access it.
         """
         while True:
-            # get link, used to maintain thread safety
+            # If program has called to stop
+            if self.stopped():
+                break
+
+            # get link lock, used to maintain thread safety
             self.url_lock.acquire()
             print(
                 f"Links found: {len(self.visited) } | Queue: {self.links.qsize()}", file=sys.stderr, end='\r')
@@ -214,14 +176,72 @@ class Crawler(Thread):
                         self.set_lock.release()
 
             except ConnectionError as e:
-                print(f"Error: {link} | connection refused", file=sys.stderr)
+                print(f"Error: {link} | connection refused",
+                      file=sys.stderr, flush=True)
 
             except Exception as e:
-                print(f"Error: {link} | {type(e)}", file=sys.stderr)
+                print(f"Error: {link} | {type(e)}",
+                      file=sys.stderr, flush=True)
 
             finally:
                 # Mark queue as ready
                 self.links.task_done()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
+
+class CrawlerManager():
+    """manages and controls threads from a single interface"""
+
+    def __init__(self, url: str, threads: int, max_depth: int) -> None:
+        """Creates a manager to manage each of the cralwer threads from a single interface.
+
+        Args:
+            url (str): the first absolute url to search
+            threads (int): the number of threads (workers) to create
+            max_depth (int): the maximum recursion before search stops
+        """
+        self.links = Queue(0)
+
+        self.link_lock = Lock()
+        self.set_lock = Lock()
+
+        self.visited: Set[str] = set()
+        self.base_url: Link = Link(url, 0)
+        self.links.put(self.base_url)
+        self.visited.add(self.base_url.url)
+
+        self.threads: List[Thread] = []
+        self.threadcount = threads
+        self.depth = max_depth
+        self.exit = False
+
+    def run(self):
+        """Creates and runs each of the threads
+        """
+        for _ in range(self.threadcount):
+            crawler = Crawler(self.base_url, self.links,
+                              self.visited, self.link_lock, self.set_lock, self.depth)
+            crawler.start()
+            self.threads.append(crawler)
+
+        # Waits for each thread to finish
+        for crawler in self.threads:
+            crawler.join()
+
+    def stop(self) -> None:
+        """
+        Stops all currently running threads when requested
+        """
+        for thread in self.threads:
+            thread.stop()
+
+    def print_links(self) -> int:
+        return self.base_url.print_link()
 
 
 def validate(url: str) -> bool:
