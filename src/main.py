@@ -1,21 +1,21 @@
 from crawler import CrawlerManager, validate
 import sys
-from time import perf_counter
+from time import perf_counter, sleep, thread_time
 import argparse
 
 
 def main():
     # Creates argument parser and arguments
-    parser = argparse.ArgumentParser(description="A multithreaded web scraper")
+    parser = argparse.ArgumentParser(
+        description="A multithreaded web scraper, exit early using CTRL + C")
     parser.add_argument('Link', metavar='link', type=str,
                         help="an absolute link to the starter website")
     parser.add_argument('-d', metavar='--depth', type=int,
-                        help="The maximum depth the crawer should search", default=3)
+                        help="The maximum depth the crawer should search, provide a negative number to search infinitely", default=3)
     parser.add_argument('-t', metavar='--thread_count',
-                        help="Number of threads to create, for smaller depths less threads can be beneficial", type=int, default=10)
+                        help="Number of threads to create, for smaller depths less threads can be beneficial", type=int, default=5)
 
     args = parser.parse_args()
-    print(args)
     url = args.Link
     max_depth = args.d
     threads = args.t
@@ -39,11 +39,12 @@ def main():
         print("program exited manually, exiting now . . .", flush=True)
 
     finally:
+        time = perf_counter() - start
         sys.stdout.flush()
-        print("\n", file=sys.stderr)
+        print("", file=sys.stderr)
         total = manager.print_links()
         print(
-            f"Finished in {perf_counter() - start:.03} | Parsed : {len(manager.visited)} | Queue: {manager.links.qsize()}\nTotal: {total}")
+            f"Finished in {time:.03} | Parsed : {len(manager.visited)} | Remaining: {manager.links.qsize()}\nTotal: {total}", file=sys.stderr)
 
 
 if __name__ == '__main__':

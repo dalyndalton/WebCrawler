@@ -87,6 +87,7 @@ class Link():
 
 class CrawlerManager():
     """manages and controls threads from a single interface"""
+
     def __init__(self, url: str, threads: int, max_depth: int) -> None:
         """Creates a manager to manage each of the cralwer threads from a single interface.
 
@@ -96,8 +97,11 @@ class CrawlerManager():
             max_depth (int): the maximum recursion before search stops
         """
         self.links = Queue(0)
+
         self.link_lock = Lock()
         self.parent_lock = Lock()
+        self.set_lock = Lock()
+
         self.visited: Set[str] = set()
         self.base_url: Link = Link(url, 0)
         self.links.put(self.base_url)
@@ -111,7 +115,7 @@ class CrawlerManager():
         """
         for _ in range(self.threadcount):
             crawler = Crawler(self.base_url, self.links,
-                              self.visited, self.link_lock, self.parent_lock, self.depth)
+                              self.visited, self.link_lock, self.parent_lock, self.set_lock, self.depth)
             crawler.daemon = True
             crawler.start()
             self.threads.append(crawler)
@@ -126,7 +130,17 @@ class CrawlerManager():
 
 class Crawler(Thread):
 
-    def __init__(self, parent: Link, links, visited, url_lock, parent_lock, max_depth=None):
+    def __init__(self, parent: Link, links: Queue, visited: set, url_lock: Lock, parent_lock: Lock, set_lock: Lock, max_depth: int = None):
+        """Creates a web crawler thread for processing html
+
+        Args:
+            parent (Link): the base link provided by the user
+            links (Queue): A queue to store all links to process
+            visited (set): a set of all previously processed links
+            url_lock (Lock): flag to prevent racing
+            parent_lock (Lock): flag to prevent racing
+            max_depth (int, optional): Maximum depth possible. Defaults to None.
+        """
         Thread.__init__(self)
         self.max_depth = max_depth
         self.base_url: Link = parent
@@ -135,11 +149,11 @@ class Crawler(Thread):
 
         self.url_lock: Lock = url_lock
         self.parent_lock: Lock = parent_lock
+        self.set_lock: Lock = set_lock
 
     def run(self) -> None:
 
         while True:
-
             # get link, used to maintain thread safety
             self.url_lock.acquire()
             print(
@@ -147,23 +161,25 @@ class Crawler(Thread):
 
             try:
                 # Thread times out after .3 seconds
-                link = self.links.get(True, .3)
+                link = self.links.get(False)
             except Empty:
+                # mark queue as empty for remaining threads
+                self.empty = True
                 break
 
             finally:
                 self.url_lock.release()
-
-            # Mark queue as ready
-            self.links.task_done()
 
             # Check if link returned
             if link is None:
                 continue
 
             # Check if site is visited
+            self.set_lock.acquire()
             if link.url in self.visited:
+                self.set_lock.release()
                 continue
+            self.set_lock.release()
 
             # Check if depth is reached
             if self.max_depth is not None:
@@ -174,23 +190,39 @@ class Crawler(Thread):
                 # Get HTML Tags
                 req = requests.get(link.url)
                 soup = BeautifulSoup(req.content, "html.parser")
+
                 # mark as visited
+                self.set_lock.acquire()
                 self.visited.add(link.url)
+                self.set_lock.release()
 
                 # search for href
                 for tag in soup.find_all('a'):
                     tempLink = Link(tag.get("href"), link.depth + 1)
                     tempLink.handle_url(self.base_url.url)
-                    if tempLink.url not in self.visited and tempLink.url is not None:
+
+                    self.set_lock.acquire()
+                    visit = tempLink.url not in self.visited
+                    self.set_lock.release()
+
+                    if visit and tempLink.url is not None:
                         # Bind Link
                         self.parent_lock.acquire()
+
                         tempLink.set_parent(link)
                         link.add_child(tempLink)
                         self.parent_lock.release()
+
+                        self.url_lock.acquire()
                         self.links.put(tempLink)
+                        self.url_lock.release()
 
             except Exception as e:
                 print(f"Error: {link} | {e}")
+
+            finally:
+                # Mark queue as ready
+                self.links.task_done()
 
 
 def validate(url: str) -> bool:

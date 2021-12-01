@@ -108,8 +108,37 @@ Data unique to the manager
 - `threads: List[Thread]` : a list of all currently running threads, used in conjunction with a listener to make sure all threads complete before exit
 - `threadcount: int` : number of threads to create
 - `depth: int ` : max depth requested by user
-  
-###
+
+`run()` starts the web crawler. When ran, creates the specified number of threads and starts them, then silenly waits for all threads to finish
+- We set the threads.dameon to true so that exiting the main program also kill all running threads.
+
+`print_links` a simple wrapper to call `print_link` on the parent link provided.
+
+### `Crawler(Thread)`
+Crawler is a basic thread capable of processing html and executing requests for html.
+
+To see what each variable does, see [`Crawler()`](###CrawlerManager)
+
+`run()` - This is the bulk of the program, if something goes wrong it is more than likely here.
+Here's how run works.  
+```
+while True:
+    get link to process from queue
+        if link cannot be found, exit thread
+    
+    check link
+        if thread is None, visited, or past depth
+            continue
+    
+    Get html and parse tags
+    add current link to visited
+    for each a tag in the html
+        if tag isn't visited
+            add tag to queue
+            bind tag to parent
+            bind parent to tag
+```
+Currently, run will only wait for .3 seconds for another request to show up before killing of it's thread. 
 ## Phase 3: Implementation *(15%)*
 
 <!-- **Deliver:**
@@ -147,17 +176,27 @@ Program was implemented through a fever dream.  Some things that needed to be ch
 
 ## Phase 6: Maintenance
 
-**Deliver:**
 
-*   Write brief and honest answers to these questions: *(Note: do this before you complete **Phase 5: Deployment**)*
-    *   What parts of your program are sloppily written and hard to understand?
-        *   Are there parts of your program which you aren't quite sure how/why they work?
-        *   If a bug is reported in a few months, how long would it take you to find the cause?
-    *   Will your documentation make sense to
-        *   anybody besides yourself?
-        *   yourself in six month's time?
-    *   How easy will it be to add a new feature to this program in a year?
-    *   Will your program continue to work after upgrading
-        *   your computer's hardware?
-        *   the operating system?
-        *   to the next version of Python?
+  > - What parts of your program are sloppily written and hard to understand?
+
+  A: Most of the threading part looks very convoluted, and took me a while to wrap my head around.  I assume if i were to visit this in the future I would go through the same headache again.
+> *   Are there parts of your program which you aren't quite sure how/why they work?
+
+   A: Yes, anything involving threading honestly.  I think I've got it down but not enough to say that I'm confident in it.
+> * If a bug is reported in a few months, how long would it take you to find the cause?
+
+A: It may take upwards of an hour, but with the small scope of the project many bugs can be easily found and located, especially considering the modular nature of the program structure.
+
+> * Will your documentation make sense to
+>   anybody besides yourself?
+>   yourself in six month's time?
+
+A: Yes, I feel as though my documentation is more than adequate, and if anything a little boring.
+
+> *   How easy will it be to add a new feature to this program in a year?
+
+A: Depending on the feature, it could be as simple as adding a method to the preexisting classes, or as hard as just starting over.  More than likely, new features should be moderately easy to add.
+
+>  Will your program continue to work after upgrading OS, hardware, or python
+
+Yes, all of the imports besides `bs4` and `requests` are included in the standard library, and no features marked for deprecation have been used.
