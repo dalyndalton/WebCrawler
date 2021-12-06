@@ -27,7 +27,8 @@ The hardest part of the assignment will be the self imposed multithreading requi
 - Maintaining data safety when accessing queue and parent classes (preventing race conditions)
 - Displaying the data after all links are created, originally you would print as found but now that isn't possible as its searching multiple places at the same time
 - Keeping track of parents and child links will also be difficult, as we can't garentee that the link currenly being processed relates to the one prior.
-- 
+- This program will not be able to be written in a "recursive" style, because we don't have the kind of time to wait for one of our processes to recurse before we begin the next set of work.
+
 ## Phase 1: System Analysis *(10%)*
 
 **Deliver:**

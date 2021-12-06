@@ -1,31 +1,35 @@
-# Recursive Web Crawler User Manual
+# **NOT Recursive** Web Crawler User Manual
 
 To get the most up to date instruction on how to run the program, run
+
 ```bash
 python src/main.py -h
 ```
 
 Currently, this is the template used to run the program
+
 ```
-usage: main.py [-h] [-d --depth] [-t --thread_count] link
+ % python src/main.py -h
+usage: main.py [-h] [-d --depth] [-t --thread_count] [-k --timeout] link
 
 A multithreaded web scraper, exit early using CTRL + C
 
 positional arguments:
   link               an absolute link to the starter website
 
-options:
+optional arguments:
   -h, --help         show this help message and exit
   -d --depth         The maximum depth the crawer should search, provide a negative number to search infinitely
   -t --thread_count  Number of threads to create, for smaller depths less threads can be beneficial
-  ```
-  - link [REQUIRED] - the absolute link to start crawling on, must include http:// or https://
+  -k --timeout       time before a thread dies, higher numbers will prevent threads from closing prematurely, but also cause the program to run longer.
+```
 
-  - -d depth - provided by doing `-d #` where `#` is the depth you want the program to search.  Default is 3
+A few notes:
 
-  - -t threads - number of threads to create when crawling the program, larger searches benefit from more threads, while smaller search suffer from more threads.  Defaults to 5, not recommended to create more than 20.
+- `timeout * thread_count` is the amount of extra needed to run the program (worst case)
 
 ## Example
+
 If i wanted to crawl `https://cs.usu.edu` with a depth of 5 and 10 threads, i would use the following command
 
 ```
@@ -36,4 +40,10 @@ if i wanted to do the same, with the default depth i would use
 
 ```
 python src/main.py https://cs.usu.edu -t 10
+```
+
+If i have a slow connection, I will want to increase the amout of time before my threads close
+
+```
+python src/main.py https://cs.usu.edu -t 10 -k .75
 ```

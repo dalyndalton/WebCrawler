@@ -16,11 +16,14 @@ def main():
                         help="The maximum depth the crawer should search, provide a negative number to search infinitely", default=3)
     parser.add_argument('-t', metavar='--thread_count',
                         help="Number of threads to create, for smaller depths less threads can be beneficial", type=int, default=5)
+    parser.add_argument('-k', metavar='--timeout',
+                        help="time before a thread dies, higher numbers will prevent threads from closing prematurely, but also cause the program to run longer.", default=0.3, type=float)
 
     args = parser.parse_args()
     url = args.Link
     max_depth = args.d
     threads = args.t
+    timeout = args.k
 
     # Invalid Link
     if not validate(url):
@@ -29,9 +32,9 @@ def main():
 
     # Build data for threads
     print(
-        f"Creating thread manager: \n threads - {threads} \n depth - {max_depth}", file=sys.stderr)
+        f"Running Crawler: \n threads - {threads} \n depth - {max_depth}\n timeout - {timeout}", file=sys.stderr)
 
-    manager = CrawlerManager(url, threads, max_depth)
+    manager = CrawlerManager(url, threads, max_depth, timeout)
     start = perf_counter()
 
     # Run program
