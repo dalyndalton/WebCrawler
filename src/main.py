@@ -51,7 +51,7 @@ def main():
         print("", file=sys.stderr)
         total = manager.print_links()
         print(
-            f"Finished in {time:.03} | Parsed : {len(manager.visited)} | Remaining: {manager.links.qsize()}\nTotal: {total}", file=sys.stderr)
+            f"Finished in {time:.3} | Parsed : {len(manager.visited)} | Remaining: {manager.links.qsize()}\nTotal: {total}", file=sys.stderr)
 
 
 if __name__ == '__main__':
