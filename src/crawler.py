@@ -12,6 +12,8 @@ from urllib.parse import urljoin
 # Use for link comparison and sorting
 from functools import total_ordering
 
+from requests.models import InvalidURL
+
 
 @total_ordering
 class Link():
@@ -91,7 +93,7 @@ class Link():
 
 class Crawler(Thread):
 
-    def __init__(self, parent: Link, links: Queue, visited: set, url_lock: Lock, set_lock: Lock, max_depth: int = None):
+    def __init__(self, parent: Link, links: Queue, visited: set, url_lock: Lock, set_lock: Lock, max_depth: int, timeout: float):
         """Creates a web crawler thread for processing html
 
         Args:
@@ -100,13 +102,15 @@ class Crawler(Thread):
             visited (set): a set of all previously processed links
             url_lock (Lock): flag to prevent racing
             parent_lock (Lock): flag to prevent racing
-            max_depth (int, optional): Maximum depth possible. Defaults to None.
+            max_depth (int, optional): Maximum depth possible.
+            timeout (int) : time before thread dies waiting
         """
         Thread.__init__(self)
         self.max_depth = max_depth
         self.base_url: Link = parent
         self.links: Queue[Link] = links
         self.visited: Set[str] = visited
+        self.timeout = timeout
 
         self.url_lock: Lock = url_lock
         self.set_lock: Lock = set_lock
@@ -116,23 +120,24 @@ class Crawler(Thread):
         """
         The code here looks messy, but its for a reason.  Whenever modifying data that is shared between threads we first need to prevent it's use in other threads, and then access it.
         """
-        while True:
-            # If program has called to stop
-            if self.stopped():
-                break
+        while not self._stop_event.is_set():
+            # Print update
+            print(
+                f"Links found: {len(self.visited) } | Queue Estimate: {self.links.qsize()}", file=sys.stderr, end='\r')
 
             # get link lock, used to maintain thread safety
             self.url_lock.acquire()
-            print(
-                f"Links found: {len(self.visited) } | Queue: {self.links.qsize()}", file=sys.stderr, end='\r')
 
             try:
                 # Thread times out after .3 seconds
-                link = self.links.get(False)
+                link = self.links.get(True, .3)
+
             except Empty:
-                # mark queue as empty for remaining threads
-                self.empty = True
-                break
+                # only exit if
+                if self.links.all_tasks_done:
+                    self.stop()
+                    break
+                continue
 
             finally:
                 self.url_lock.release()
@@ -147,13 +152,13 @@ class Crawler(Thread):
                     continue
 
             try:
-                # mark as visited
-                self.set_lock.acquire()
-                self.set_lock.release()
 
                 # Get HTML Tags
                 req = requests.get(link.url)
                 soup = BeautifulSoup(req.content, "html.parser")
+
+                # signifies to queue to continue
+                self.links.task_done()
 
                 # search for href
                 for tag in soup.find_all('a'):
@@ -179,25 +184,22 @@ class Crawler(Thread):
                 print(f"Error: {link} | connection refused",
                       file=sys.stderr, flush=True)
 
+            except InvalidURL:
+                print(f"Error: {link} | invalid URL",
+                      file=sys.stderr, flush=True)
+
             except Exception as e:
                 print(f"Error: {link} | {type(e)}",
                       file=sys.stderr, flush=True)
 
-            finally:
-                # Mark queue as ready
-                self.links.task_done()
-
     def stop(self):
         self._stop_event.set()
-
-    def stopped(self):
-        return self._stop_event.is_set()
 
 
 class CrawlerManager():
     """manages and controls threads from a single interface"""
 
-    def __init__(self, url: str, threads: int, max_depth: int) -> None:
+    def __init__(self, url: str, threads: int, max_depth: int, timeout: float) -> None:
         """Creates a manager to manage each of the cralwer threads from a single interface.
 
         Args:
@@ -218,20 +220,22 @@ class CrawlerManager():
         self.threads: List[Thread] = []
         self.threadcount = threads
         self.depth = max_depth
-        self.exit = False
+        self.timeout = timeout
 
     def run(self):
         """Creates and runs each of the threads
         """
         for _ in range(self.threadcount):
             crawler = Crawler(self.base_url, self.links,
-                              self.visited, self.link_lock, self.set_lock, self.depth)
+                              self.visited, self.link_lock, self.set_lock, self.depth, self.timeout)
             crawler.start()
             self.threads.append(crawler)
 
         # Waits for each thread to finish
-        for crawler in self.threads:
+        for idx, crawler in enumerate(self.threads):
             crawler.join()
+            print(f"Closing crawler {idx + 1}",
+                  file=sys.stderr, flush=True, end='\r')
 
     def stop(self) -> None:
         """
