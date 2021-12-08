@@ -2,7 +2,7 @@
 
 from crawler import CrawlerManager, validate
 import sys
-from time import perf_counter, sleep, thread_time
+from time import perf_counter
 import argparse
 
 
