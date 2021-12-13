@@ -39,26 +39,22 @@ The hardest part of the assignment will be the self imposed multithreading requi
 
 Data from this program will be coming from the *WorldWideWeb*, or any web server that houses html.  Websites will be specified in the command line, along with several optional features.
 
-```
-python src/main.py link [depth[thread count]]
-```
-
 Users can provide a custom depth to prevent their program from eating the internet, and a custom thread count to min / max performance and time.
 
 ### Algorithms
 We aren't doing much in the way of mathematics, but we are creating a few things of note.
 
-- A double linked list of parents to children
+- A tree of parents to children
 - Parsing URLS and determining validity
 - Locks for data safety
-- 
+  
 ## Phase 2: Design *(30%)*
 
 ### ILLEGAL IMPORTS AND THEIR USES
-`queue` - provides a thread safe data structure for use with `threading`
-`threading` - allows the creation of multiple threads to perform requests concurrently, this way i can request multiple websites at once.
-`typing` - python type hinting, helps with ide completion and self documentation
-`functools` - provides the total ordering decorator, which means I only have to write 2 comparison operators and it extrapolates the rest, used to allow for sorting on custom classes.
+`queue` - provides a thread safe data structure for use with `threading` \
+`threading` - allows the creation of multiple threads to perform requests concurrently, this way i can request multiple websites at once. \
+`typing` - python type hinting, helps with ide completion and self documentation \
+`functools` - provides the total ordering decorator, which means I only have to write 2 comparison operators and it extrapolates the rest, used to allow for sorting on custom classes. \
 `argparse` - allows for the creation of simple command line interface arguments, also enables tab completion 
 
 Ok so i got a *little* carried away with the imports, the assignments about 3rd party imports right? Plus everything here is included in the standard library, so no imports should be needed.
@@ -87,7 +83,8 @@ The link class acts as both a data structure and a data parser for our links and
 
 This function also includes some comparison functions( `__lt__` and `__eq__`) that, alongside the `@totalordering`, allow the links to be sorted like a list of strings.
 
-`print_list()` keeps track of both how many elements have been found, as well as displays the links and children with proper formatting recursively.  Returns the number of links found.
+`print_list()` keeps track of both how many elements have been found, as well as displays the links and children with proper formatting recursively.  Returns the number of links found. 
+This could also be seen as a recursive function, so if you're looking to see that I know recursion hey look here.
 
 `handle_url` modifies the internal `url` variable by first checking its validity, converting to an absolute if needed, and discarding if missing the proper schema.
 
@@ -164,6 +161,7 @@ Program was implemented through a fever dream.  Some things that needed to be ch
 - A bug was discovered during implementation where it would never progress past the first depth, this was due to incorrectly marking found links as visited before parsed.
 - Threads created plenty of bugs when they would die early or never quit, this was remedied by only killing a thread when the queue is empty for .3 seconds.
 
+Testing was performed against the `test_server.py` website, as well as against the general web.  During testing, we've found that while the bot doesn't hande edge case errors (such as those present in web crawling test websites), the bot runs well on many general websites, which is what it is intended for.
 ## Phase 5: Deployment *(5%)*
 
 **Deliver:**
@@ -174,7 +172,7 @@ Program was implemented through a fever dream.  Some things that needed to be ch
 *   **Validate** that your submission is complete and correct by cloning it to a new location on your computer and re-running it.
     *   Run through your test cases to avoid nasty surprises.
 
-
+If you're reading this it has been properly deployed.
 ## Phase 6: Maintenance
 
 
@@ -201,3 +199,5 @@ A: Depending on the feature, it could be as simple as adding a method to the pre
 >  Will your program continue to work after upgrading OS, hardware, or python
 
 Yes, all of the imports besides `bs4` and `requests` are included in the standard library, and no features marked for deprecation have been used.
+
+anyways wish I could've put more time into this assignment, but for now thanks for teaching 1440 erik.  See you in 2610 next semester 😁

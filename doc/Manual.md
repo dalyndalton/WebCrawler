@@ -1,5 +1,6 @@
 # **NOT Recursive** Web Crawler User Manual
 
+## How to Run
 To get the most up to date instruction on how to run the program, run
 
 ```bash
@@ -47,3 +48,8 @@ If i have a slow connection, I will want to increase the amout of time before my
 ```
 python src/main.py https://cs.usu.edu -t 10 -k .75
 ```
+
+## Differences
+
+"Dalton i gave you permission to multithread it not write a whole new program."
+Ok, first off I didn't I just gave the bot a few more customization options for powerusers. As well, I also changed the way that the 

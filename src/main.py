@@ -25,6 +25,9 @@ def main():
     threads = args.t
     timeout = args.k
 
+    if max_depth == 1:
+        threads = 1
+
     # Invalid Link
     if not validate(url):
         print("Invalid url, please provide url with included schema 'http://' or 'https://'", file=sys.stderr)
